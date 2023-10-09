@@ -1,6 +1,6 @@
 import Flutter
 import UIKit
-import Alamofire
+//import Alamofire
 
 private let validHttpMethods = ["POST", "PUT", "PATCH"]
 
@@ -238,74 +238,78 @@ public class SwiftFlutterUploaderPlugin: NSObject, FlutterPlugin {
         tag: String?,
         allowCellular: Bool,
         completion completionHandler:@escaping (URLSessionUploadTask?, FlutterError?) -> Void) {
-        var flutterError: FlutterError?
-        let fileManager = FileManager.default
-        var fileCount: Int = 0
-        let formData = MultipartFormData()
-        let tempDirectory = NSURL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-
-        if data != nil {
-            data?.forEach({ (key, value) in
-                if let value = value as? String {
-                    formData.append(value.data(using: .utf8)!, withName: key)
-                }
-            })
-        }
-
-        for file in files {
-            guard let file = file as? [String: Any],
-                  let fieldname = file[Key.fieldname] as? String,
-                  let path = file[Key.path] as? String else {
-                continue
-            }
-
-            var isDir: ObjCBool = false
-
-            let fileManager = FileManager.default
-            if fileManager.fileExists(atPath: path, isDirectory: &isDir) {
-                if !isDir.boolValue {
-                    let fileInfo = UploadFileInfo(fieldname: fieldname, path: path)
-                    let filePath = URL(fileURLWithPath: fileInfo.path)
-                    formData.append(filePath, withName: fileInfo.fieldname, fileName: filePath.lastPathComponent, mimeType: fileInfo.mimeType)
-                    fileCount += 1
-                } else {
-                    flutterError = FlutterError(code: "io_error", message: "path \(path) is a directory. please provide valid file path", details: nil)
-                }
-            } else {
-                flutterError = FlutterError(code: "io_error", message: "file at path \(path) doesn't exists", details: nil)
-            }
-        }
-
-        guard fileCount > 0 else {
-            completionHandler(nil, flutterError)
+            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request (this func not work!)", details: nil))
             return
-        }
-
-        let requestId = UUID().uuidString.replacingOccurrences(of: "-", with: "_")
-        let requestFile = "\(requestId).req"
-        let tempPath = tempDirectory.appendingPathComponent(requestFile, isDirectory: false)
-
-        if fileManager.fileExists(atPath: tempPath!.path) {
-            do {
-                try fileManager.removeItem(at: tempPath!)
-            } catch {
-                completionHandler(nil, FlutterError(code: "io_error", message: "failed to delete file \(requestFile)", details: nil))
-                return
-            }
-        }
-
-        let path = tempPath!.path
-        do {
-            let requestfileURL = URL(fileURLWithPath: path)
-            try formData.writeEncodedData(to: requestfileURL)
-        } catch {
-            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request \(requestFile)", details: nil))
-            return
-        }
-
-        self.makeRequest(path, url, method, headers, formData.contentType, formData.contentLength, allowCellular: allowCellular, completion: { (task, error) in
-            completionHandler(task, error)
-        })
+            
+//            
+//         var   flutterError : FlutterError?
+//        let fileManager = FileManager.default
+//        var fileCount: Int = 0
+////        let formData = MultipartFormData()
+//        let tempDirectory = NSURL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+//
+//        if data != nil {
+//            data?.forEach({ (key, value) in
+//                if let value = value as? String {
+//                    formData.append(value.data(using: .utf8)!, withName: key)
+//                }
+//            })
+//        }
+//
+//        for file in files {
+//            guard let file = file as? [String: Any],
+//                  let fieldname = file[Key.fieldname] as? String,
+//                  let path = file[Key.path] as? String else {
+//                continue
+//            }
+//
+//            var isDir: ObjCBool = false
+//
+//            let fileManager = FileManager.default
+//            if fileManager.fileExists(atPath: path, isDirectory: &isDir) {
+//                if !isDir.boolValue {
+//                    let fileInfo = UploadFileInfo(fieldname: fieldname, path: path)
+//                    let filePath = URL(fileURLWithPath: fileInfo.path)
+//                    formData.append(filePath, withName: fileInfo.fieldname, fileName: filePath.lastPathComponent, mimeType: fileInfo.mimeType)
+//                    fileCount += 1
+//                } else {
+//                    flutterError = FlutterError(code: "io_error", message: "path \(path) is a directory. please provide valid file path", details: nil)
+//                }
+//            } else {
+//                flutterError = FlutterError(code: "io_error", message: "file at path \(path) doesn't exists", details: nil)
+//            }
+//        }
+//
+//        guard fileCount > 0 else {
+//            completionHandler(nil, flutterError)
+//            return
+//        }
+//
+//        let requestId = UUID().uuidString.replacingOccurrences(of: "-", with: "_")
+//        let requestFile = "\(requestId).req"
+//        let tempPath = tempDirectory.appendingPathComponent(requestFile, isDirectory: false)
+//
+//        if fileManager.fileExists(atPath: tempPath!.path) {
+//            do {
+//                try fileManager.removeItem(at: tempPath!)
+//            } catch {
+//                completionHandler(nil, FlutterError(code: "io_error", message: "failed to delete file \(requestFile)", details: nil))
+//                return
+//            }
+//        }
+//
+//        let path = tempPath!.path
+//        do {
+//            let requestfileURL = URL(fileURLWithPath: path)
+//            try formData.writeEncodedData(to: requestfileURL)
+//        } catch {
+//            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request \(requestFile)", details: nil))
+//            return
+//        }
+//
+//        self.makeRequest(path, url, method, headers, formData.contentType, formData.contentLength, allowCellular: allowCellular, completion: { (task, error) in
+//            completionHandler(task, error)
+//        })
     }
 
     private func makeRequest(
