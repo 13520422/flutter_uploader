@@ -72,10 +72,43 @@ class URLSessionUploader: NSObject {
 
         return uploadTask
     }
+    
+    func enqueueDataTask(_ request: URLRequest, wifiOnly: Bool) -> URLSessionDataTask? {
+        guard let session = self.session,
+              let wifiSession = self.wifiSession else {
+            return nil
+        }
+
+        let activeSession = wifiOnly ? wifiSession : session
+        let uploadTask = activeSession.dataTask(
+                with: request as URLRequest
+        )
+
+        // Create a random UUID as task description (& ID).
+        uploadTask.taskDescription = UUID().uuidString
+
+        let taskId = identifierForDataTask(uploadTask)
+
+        delegates.uploadEnqueued(taskId: taskId)
+
+        uploadTask.resume()
+
+        semaphore.wait()
+        self.runningTaskById[taskId] = UploadTask(taskId: taskId, status: .enqueue, progress: 0)
+        semaphore.signal()
+
+        return uploadTask
+    }
+    
+    
 
     ///
     /// The description on URLSessionTask.taskIdentifier explains how the task is only unique within a session.
     public func identifierForTask(_ task: URLSessionUploadTask) -> String {
+        return  "\(self.session?.configuration.identifier ?? "chillisoure.flutter_uploader").\(task.taskDescription!)"
+    }
+    
+    public func identifierForDataTask(_ task: URLSessionDataTask) -> String {
         return  "\(self.session?.configuration.identifier ?? "chillisoure.flutter_uploader").\(task.taskDescription!)"
     }
 
@@ -190,14 +223,21 @@ extension URLSessionUploader: URLSessionDelegate, URLSessionDataDelegate, URLSes
         }
 
         NSLog("URLSessionDidReceiveData:")
-
-        guard let uploadTask = dataTask as? URLSessionUploadTask else {
-            NSLog("URLSessionDidReceiveData: not an uplaod task")
-            return
+        var taskId:String
+        
+        if dataTask is URLSessionUploadTask {
+           guard let uploadTask = dataTask
+                   as? URLSessionUploadTask else {
+               NSLog("URLSessionDidReceiveData: not an upload task")
+               return
+           }
+            taskId = identifierForTask(uploadTask)
+        }else{
+            taskId = identifierForDataTask(dataTask)
         }
 
         if data.count > 0 {
-            let taskId = identifierForTask(uploadTask)
+            
             if var existing = uploadedData[taskId] {
                 existing.append(data)
             } else {
@@ -223,12 +263,32 @@ extension URLSessionUploader: URLSessionDelegate, URLSessionDataDelegate, URLSes
         if totalBytesExpectedToSend == NSURLSessionTransferSizeUnknown {
             NSLog("Unknown transfer size")
         } else {
-            guard let uploadTask = task as? URLSessionUploadTask else {
-                NSLog("URLSessionDidSendBodyData: an not uplaod task")
-                return
+//            guard let uploadTask = task as? URLSessionUploadTask else {
+//                NSLog("URLSessionDidSendBodyData: an not uplaod task")
+//                return
+//            }
+            var taskId:String = ""
+            
+            if task is URLSessionUploadTask {
+               guard let uploadTask = task
+                       as? URLSessionUploadTask else {
+                   NSLog("URLSessionDidSendBodyData: not an upload task")
+                   return
+               }
+                taskId = identifierForTask(uploadTask)
+            }else{
+                if task is URLSessionDataTask {
+                   guard let dataTask = task
+                           as? URLSessionDataTask else {
+                       NSLog("URLSessionDidSendBodyData: not an data task")
+                       return
+                   }
+                    taskId = identifierForDataTask(dataTask)
+                }
+               
             }
 
-            let taskId = identifierForTask(uploadTask)
+//            let taskId = identifierForTask(uploadTask)
             let bytesExpectedToSend = Double(totalBytesExpectedToSend)
             let tBytesSent = Double(totalBytesSent)
             let progress = round(Double(tBytesSent / bytesExpectedToSend * 100))
@@ -274,12 +334,33 @@ extension URLSessionUploader: URLSessionDelegate, URLSessionDataDelegate, URLSes
             semaphore.signal()
         }
 
-        guard let uploadTask = task as? URLSessionUploadTask else {
-            NSLog("URLSessionDidCompleteWithError: not an uplaod task")
-            return
+//        guard let uploadTask = task as? URLSessionUploadTask else {
+//            NSLog("URLSessionDidCompleteWithError: not an uplaod task")
+//            return
+//        }
+//
+//        let taskId = identifierForTask(uploadTask)
+        
+        var taskId:String = ""
+        
+        if task is URLSessionUploadTask {
+           guard let uploadTask = task
+                   as? URLSessionUploadTask else {
+               NSLog("URLSessionDidCompleteWithError: not an upload task")
+               return
+           }
+            taskId = identifierForTask(uploadTask)
+        }else{
+            if task is URLSessionDataTask {
+               guard let dataTask = task
+                       as? URLSessionDataTask else {
+                   NSLog("URLSessionDidCompleteWithError: not an data task")
+                   return
+               }
+                taskId = identifierForDataTask(dataTask)
+            }
+           
         }
-
-        let taskId = identifierForTask(uploadTask)
 
         if error != nil {
             NSLog("URLSessionDidCompleteWithError: \(taskId) failed with \(error!.localizedDescription)")
@@ -335,8 +416,22 @@ extension URLSessionUploader: URLSessionDelegate, URLSessionDataDelegate, URLSes
         } else {
             message = nil
         }
-
-        let statusText = uploadTask.state.statusText()
+        var statusText:String = "unknown"
+        if task is URLSessionUploadTask {
+            guard let uploadTask = task
+                    as? URLSessionUploadTask else {
+                return
+            }
+            statusText = uploadTask.state.statusText()
+        }else{
+            guard let uploadTask = task
+                    as? URLSessionDataTask else {
+                return
+            }
+            statusText = uploadTask.state.statusText()
+        }
+        
+//        let statusText = uploadTask.state.statusText()
         if error == nil && !hasResponseError {
             NSLog("URLSessionDidCompleteWithError: response: \(message ?? "null"), task: \(statusText)")
             self.delegates.uploadCompleted(taskId: taskId, message: message, statusCode: response?.statusCode ?? 200, headers: responseHeaders)

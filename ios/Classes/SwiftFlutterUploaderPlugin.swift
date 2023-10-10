@@ -140,7 +140,7 @@ public class SwiftFlutterUploaderPlugin: NSObject, FlutterPlugin {
                 if error != nil {
                     result(error!)
                 } else if let uploadTask = task {
-                    result(self.urlSessionUploader.identifierForTask(uploadTask))
+                    result(self.urlSessionUploader.identifierForDataTask(uploadTask))
                 }
             })
     }
@@ -237,80 +237,104 @@ public class SwiftFlutterUploaderPlugin: NSObject, FlutterPlugin {
         parameters data: [String: Any?]?,
         tag: String?,
         allowCellular: Bool,
-        completion completionHandler:@escaping (URLSessionUploadTask?, FlutterError?) -> Void) {
-            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request (this func not work!)", details: nil))
-            return
+//        completion completionHandler:@escaping (String?, FlutterError?) -> Void) {
+        completion completionHandler:@escaping (URLSessionDataTask?, FlutterError?) -> Void) {
+//            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request (this func not work!)", details: nil))
+//            return
             
-//            
-//         var   flutterError : FlutterError?
-//        let fileManager = FileManager.default
-//        var fileCount: Int = 0
-////        let formData = MultipartFormData()
-//        let tempDirectory = NSURL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-//
-//        if data != nil {
-//            data?.forEach({ (key, value) in
-//                if let value = value as? String {
+            
+         var   flutterError : FlutterError?
+        let fileManager = FileManager.default
+        var fileCount: Int = 0
+//        let formData = MultipartFormData()
+            
+        /// lam thêm
+        let _url = URL(string: "\(url)")!
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: _url)
+        request.httpMethod = method
+        var body = Data()
+        ///
+            
+        let tempDirectory = NSURL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if headers != nil {
+            headers?.forEach({ (key, value) in
+                if let value = value as? String {
+                    request.setValue(value, forHTTPHeaderField: key)
+                }
+            })
+        }
+        if data != nil {
+            data?.forEach({ (key, value) in
+                if let value = value as? String {
 //                    formData.append(value.data(using: .utf8)!, withName: key)
-//                }
-//            })
-//        }
-//
-//        for file in files {
-//            guard let file = file as? [String: Any],
-//                  let fieldname = file[Key.fieldname] as? String,
-//                  let path = file[Key.path] as? String else {
-//                continue
-//            }
-//
-//            var isDir: ObjCBool = false
-//
-//            let fileManager = FileManager.default
-//            if fileManager.fileExists(atPath: path, isDirectory: &isDir) {
-//                if !isDir.boolValue {
-//                    let fileInfo = UploadFileInfo(fieldname: fieldname, path: path)
-//                    let filePath = URL(fileURLWithPath: fileInfo.path)
+                    body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                    body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
+                    body.append("\(value)\r\n".data(using: .utf8)!)
+                }
+            })
+        }
+
+        for file in files {
+            guard let file = file as? [String: Any],
+                  let fieldname = file[Key.fieldname] as? String,
+                  let path = file[Key.path] as? String else {
+                continue
+            }
+
+            var isDir: ObjCBool = false
+
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: path, isDirectory: &isDir) {
+                if !isDir.boolValue {
+                    let fileInfo = UploadFileInfo(fieldname: fieldname, path: path)
+                    let filePath = URL(fileURLWithPath: fileInfo.path)
+                    
 //                    formData.append(filePath, withName: fileInfo.fieldname, fileName: filePath.lastPathComponent, mimeType: fileInfo.mimeType)
-//                    fileCount += 1
-//                } else {
-//                    flutterError = FlutterError(code: "io_error", message: "path \(path) is a directory. please provide valid file path", details: nil)
-//                }
-//            } else {
-//                flutterError = FlutterError(code: "io_error", message: "file at path \(path) doesn't exists", details: nil)
-//            }
-//        }
-//
-//        guard fileCount > 0 else {
-//            completionHandler(nil, flutterError)
-//            return
-//        }
-//
-//        let requestId = UUID().uuidString.replacingOccurrences(of: "-", with: "_")
-//        let requestFile = "\(requestId).req"
-//        let tempPath = tempDirectory.appendingPathComponent(requestFile, isDirectory: false)
-//
-//        if fileManager.fileExists(atPath: tempPath!.path) {
-//            do {
-//                try fileManager.removeItem(at: tempPath!)
-//            } catch {
-//                completionHandler(nil, FlutterError(code: "io_error", message: "failed to delete file \(requestFile)", details: nil))
-//                return
-//            }
-//        }
-//
-//        let path = tempPath!.path
-//        do {
-//            let requestfileURL = URL(fileURLWithPath: path)
-//            try formData.writeEncodedData(to: requestfileURL)
-//        } catch {
-//            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request \(requestFile)", details: nil))
-//            return
-//        }
-//
-//        self.makeRequest(path, url, method, headers, formData.contentType, formData.contentLength, allowCellular: allowCellular, completion: { (task, error) in
-//            completionHandler(task, error)
-//        })
+                    
+                    ///lam thêm
+                    let fileData = try! Data(contentsOf: filePath)
+                            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                            body.append("Content-Disposition: form-data; name=\"files\"; filename=\"\(filePath.lastPathComponent)\"\r\n".data(using: .utf8)!)
+                            body.append("Content-Type: \(fileInfo.mimeType)\r\n\r\n".data(using: .utf8)!)
+                            body.append(fileData)
+                            body.append("\r\n".data(using: .utf8)!)
+                    
+                    ///
+                    
+                    
+                    fileCount += 1
+                } else {
+                    flutterError = FlutterError(code: "io_error", message: "path \(path) is a directory. please provide valid file path", details: nil)
+                }
+            } else {
+                flutterError = FlutterError(code: "io_error", message: "file at path \(path) doesn't exists", details: nil)
+            }
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+                
+        request.httpBody = body
+
+        guard fileCount > 0 else {
+            completionHandler(nil, flutterError)
+            return
+        }
+
+
+        do {
+            
+            completionHandler(self.urlSessionUploader.enqueueDataTask(request as URLRequest, wifiOnly: !allowCellular), nil)
+        } catch {
+            completionHandler(nil, FlutterError(code: "io_error", message: "failed to write request", details: nil))
+            return
+        }
+
+
     }
+    
+  
 
     private func makeRequest(
         _ path: String,
